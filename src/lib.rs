@@ -1,20 +1,21 @@
+use std::collections::HashMap;
+use std::io::Read;
+
 use base64;
+use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
-use serde_json::Value;
-use std::collections::HashMap;
 use serde::de::DeserializeOwned;
+use serde_json::Value;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 pub use errors::{
-	ImportResult,
-	ImportError,
-	ExportResult,
 	ExportError,
+	ExportResult,
+	ImportError,
+	ImportResult,
 };
-use std::io::Read;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -448,24 +449,11 @@ pub struct Filter {
 pub enum SignalOrConstant {
 	#[serde(rename = "second_signal")]
 	Signal(SignalID),
+	/// Serde Bug: #1504
+	/// Aliases for flattened structs or enums don't work.
 	#[serde(rename = "constant", alias = "second_constant")]
 	Constant(i32),
 }
-
-//{
-//	"arithmetic_conditions" : {
-//		"first_signal" : {
-//			"type" : "virtual",
-//			"name" : "signal-each"
-//		},
-//		"second_constant" : 0,
-//		"operation" : "+",
-//		"output_signal" : {
-//			"type" : "virtual",
-//			"name" : "signal-0"
-//		}
-//	}
-//}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Comparator {
@@ -634,34 +622,28 @@ impl BlueprintObject {
 	}
 }
 
+const CURRENT_MAP_VERSION: u64 = 73018966017;
+
 impl Blueprint {
 	pub fn export(&self) -> ExportResult<String> {
 		export(self)
 	}
 
-	pub fn renumber_entities(&mut self) {
-		for (index, entity) in self.entities.iter_mut().enumerate() {
-			entity.entity_number = index as i32 + 1;
-		}
-	}
-
 	pub fn simple(name: String, entities: Vec<Entity>) -> Blueprint {
-		let mut result = Blueprint {
-			item: "blueprint".to_string(),
+		Blueprint {
+			item: "blueprint".into(),
 			label: Some(name),
 			entities,
-			version: 73018966017,
+			version: CURRENT_MAP_VERSION,
 			..Default::default()
-		};
-		result.renumber_entities();
-		result
+		}
 	}
 }
 
 impl BlueprintBook {
 	pub fn simple(name: String, blueprints: Vec<Blueprint>) -> BlueprintBook {
 		BlueprintBook {
-			item: "blueprint-book".to_string(),
+			item: "blueprint-book".into(),
 			label: Some(name),
 			blueprints: blueprints
 				.into_iter()
@@ -672,17 +654,16 @@ impl BlueprintBook {
 				})
 				.collect(),
 			active_index: 0,
-			version: 73018966017,
+			version: CURRENT_MAP_VERSION,
 			..Default::default()
 		}
 	}
 }
 
 pub mod errors {
-	use thiserror::Error;
-
-	use serde_json::Error as JsonError;
 	use base64::DecodeError;
+	use serde_json::Error as JsonError;
+	use thiserror::Error;
 
 	pub type ImportResult<T> = std::result::Result<T, crate::errors::ImportError>;
 	pub type ExportResult<T> = std::result::Result<T, crate::errors::ExportError>;
